@@ -17,7 +17,7 @@ export default defineEventHandler((event) => {
   // Allow preflight requests
   if (event.method === 'OPTIONS') return;
 
-  const token = useRuntimeConfig(event).accessToken;
+  const token = useRuntimeConfig(event).public.accessToken;
   if (!token) {
     throw createError({
       statusCode: 500,

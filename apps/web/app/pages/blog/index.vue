@@ -3,17 +3,17 @@
     <!-- Blog Posts Section -->
     <section>
       <div class="flex items-center justify-between mb-6">
-        <h2 class="text-2xl font-bold">Blog</h2>
+        <h2 class="text-2xl font-bold">{{ t('blog.title') }}</h2>
         <NuxtLink
           to="/blog/new"
           class="text-sm px-3 py-1.5 rounded-md bg-blue-600 hover:bg-blue-500 transition-colors"
         >
-          + New Post
+          {{ t('blog.new') }}
         </NuxtLink>
       </div>
 
       <div v-if="blogPosts.length === 0" class="text-gray-500 text-sm">
-        No posts yet. Write your first one!
+        {{ t('blog.noPosts') }}
       </div>
 
       <div class="space-y-4">
@@ -42,9 +42,9 @@
 
     <!-- Devlog Section -->
     <section>
-      <h2 class="text-2xl font-bold mb-6">Devlog</h2>
+      <h2 class="text-2xl font-bold mb-6">{{ t('blog.devlog') }}</h2>
       <div v-if="devlogs.length === 0" class="text-gray-500 text-sm">
-        No devlogs yet.
+        {{ t('blog.noDevlog') }}
       </div>
 
       <div class="space-y-4">
@@ -70,40 +70,30 @@
   </div>
 </template>
 
-<script lang="ts">
-import { defineComponent } from 'vue';
+<script setup lang="ts">
+const { t } = useI18n();
+const token = useRuntimeConfig().public.accessToken;
+const authHeader = { Authorization: `Bearer ${token}` };
 
-export default defineComponent({
-  data() {
-    return {
-      blogPosts: [] as any[],
-      devlogs: [] as any[],
-    };
-  },
-  mounted() {
-    this.fetchData();
-  },
-  methods: {
-    async fetchData() {
-      const token = 'Bearer dev-token-change-me';
-      try {
-        const [posts, logs] = await Promise.all([
-          $fetch('/api/posts', { headers: { Authorization: token } }),
-          $fetch('/api/devlog', { headers: { Authorization: token } }),
-        ]);
-        this.blogPosts = posts || [];
-        this.devlogs = logs || [];
-      } catch {
-        // leave defaults
-      }
-    },
-    formatDate(d: string | Date) {
-      return new Date(d).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-      });
-    },
-  },
+const blogPosts = ref<any[]>([]);
+const devlogs = ref<any[]>([]);
+
+onMounted(async () => {
+  try {
+    const [posts, logs] = await Promise.all([
+      $fetch('/api/posts', { headers: authHeader }),
+      $fetch('/api/devlog', { headers: authHeader }),
+    ]);
+    blogPosts.value = posts || [];
+    devlogs.value = logs || [];
+  } catch { /* leave defaults */ }
 });
+
+function formatDate(d: string | Date) {
+  return new Date(d).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
+}
 </script>

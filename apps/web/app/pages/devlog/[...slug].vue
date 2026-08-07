@@ -4,7 +4,7 @@
       to="/blog"
       class="text-sm text-gray-500 hover:text-gray-300 transition-colors mb-6 inline-block"
     >
-      ← Back
+      {{ t('blog.back') }}
     </NuxtLink>
 
     <div v-if="entry" class="space-y-6">
@@ -34,9 +34,11 @@
 </template>
 
 <script setup lang="ts">
+const { t } = useI18n();
 const route = useRoute();
 const slug = (route.params.slug as string[])?.join('/') || '';
 const entry = ref<any>(null);
+const authHeader = { Authorization: `Bearer ${useRuntimeConfig().public.accessToken}` };
 
 const renderedContent = computed(() => {
   if (!entry.value?.content) return '';
@@ -56,7 +58,7 @@ const renderedContent = computed(() => {
 onMounted(async () => {
   try {
     entry.value = await $fetch(`/api/devlog/${slug}`, {
-      headers: { Authorization: `Bearer dev-token-change-me` },
+      headers: authHeader,
     });
   } catch {
     entry.value = null;

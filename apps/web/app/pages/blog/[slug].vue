@@ -4,7 +4,7 @@
       to="/blog"
       class="text-sm text-gray-500 hover:text-gray-300 transition-colors mb-6 inline-block"
     >
-      ← Back to Blog
+      {{ t('blog.back') }}
     </NuxtLink>
 
     <div v-if="errorMsg" class="text-red-400">
@@ -37,10 +37,12 @@
 </template>
 
 <script setup lang="ts">
+const { t } = useI18n();
 const route = useRoute();
 const slug = route.params.slug as string;
 const post = ref<any>(null);
 const errorMsg = ref('');
+const authHeader = { Authorization: `Bearer ${useRuntimeConfig().public.accessToken}` };
 
 const renderedContent = computed(() => {
   if (!post.value?.content) return '';
@@ -61,7 +63,7 @@ const renderedContent = computed(() => {
 onMounted(async () => {
   try {
     post.value = await $fetch(`/api/posts?slug=${slug}`, {
-      headers: { Authorization: `Bearer dev-token-change-me` },
+      headers: authHeader,
     });
   } catch (e: any) {
     errorMsg.value = e.data?.statusMessage || 'Failed to load post';
