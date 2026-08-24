@@ -5,10 +5,21 @@
       <h2 class="text-2xl font-bold flex-1">{{ t('vault.title') }}</h2>
       <input
         v-model="search"
-        :placeholder="t('vault.search')"
+        :placeholder="searchMode === 'semantic' ? t('vault.searchSemantic') : t('vault.search')"
         class="px-3 py-2 rounded-md bg-gray-900 border border-gray-700 focus:border-green-500 outline-none text-sm w-48"
         @input="loadSnippets"
       />
+      <!-- Search mode toggle -->
+      <button
+        class="px-2 py-2 rounded-md text-xs border transition-colors shrink-0"
+        :class="searchMode === 'semantic'
+          ? 'border-blue-500 text-blue-400 bg-blue-900/30'
+          : 'border-gray-700 text-gray-500 hover:border-gray-600'"
+        :title="searchMode === 'semantic' ? t('vault.semanticMode') : t('vault.keywordMode')"
+        @click="toggleSearchMode"
+      >
+        {{ searchMode === 'semantic' ? t('vault.searchAI') : t('vault.searchKeyword') }}
+      </button>
       <select
         v-model="langFilter"
         class="px-3 py-2 rounded-md bg-gray-900 border border-gray-700 text-sm"
@@ -44,6 +55,16 @@
         </div>
         <div v-if="snippets.length === 0" class="text-gray-600 text-sm text-center py-8">
           {{ t('vault.noSnippets') }}
+        </div>
+        <!-- Backfill trigger (shown when snippets exist) -->
+        <div v-if="snippets.length > 0" class="px-2 pt-2 border-t border-gray-800 mt-2">
+          <button
+            class="w-full text-xs text-gray-600 hover:text-blue-400 transition-colors py-1"
+            @click="runBackfill"
+          >
+            {{ t('vault.backfillEmbeddings') }}
+          </button>
+          <p v-if="backfillStatus" class="text-xs text-gray-500 mt-1">{{ backfillStatus }}</p>
         </div>
       </div>
 
@@ -99,9 +120,53 @@
           <button v-else class="text-sm text-blue-400 hover:underline" @click="requestExplain">{{ t('vault.explainGenerate') }}</button>
         </template>
 
-        <!-- Empty state -->
-        <div v-else class="text-gray-600 text-sm text-center py-12">
-          {{ t('vault.selectHint') }}
+        <!-- Guide / Empty state (shown when no snippet selected and not editing) -->
+        <div v-else class="space-y-6">
+          <div class="p-5 rounded-lg border border-green-800/50 bg-green-900/10 space-y-4">
+            <h3 class="text-sm font-semibold text-green-300 flex items-center gap-2">
+              <span class="text-lg">💡</span>
+              {{ t('vault.guideTitle') }}
+            </h3>
+
+            <!-- Step 1 -->
+            <div class="space-y-2">
+              <h4 class="text-xs font-semibold text-gray-400">{{ t('vault.guideStep1Title') }}</h4>
+              <p class="text-xs text-gray-500 leading-relaxed">{{ t('vault.guideStep1Desc') }}</p>
+            </div>
+
+            <!-- Step 2 -->
+            <div class="space-y-2">
+              <h4 class="text-xs font-semibold text-gray-400">{{ t('vault.guideStep2Title') }}</h4>
+              <p class="text-xs text-gray-500 leading-relaxed">{{ t('vault.guideStep2Desc') }}</p>
+            </div>
+
+            <!-- Step 3 -->
+            <div class="space-y-2">
+              <h4 class="text-xs font-semibold text-gray-400">{{ t('vault.guideStep3Title') }}</h4>
+              <p class="text-xs text-gray-500 leading-relaxed">{{ t('vault.guideStep3Desc') }}</p>
+            </div>
+
+            <!-- Example snippets -->
+            <div class="space-y-2 pt-2 border-t border-gray-800">
+              <h4 class="text-xs font-semibold text-green-400">
+                {{ t('vault.guideExamples') }}
+              </h4>
+              <div class="space-y-2">
+                <button
+                  v-for="ex in vaultExamples"
+                  :key="ex.title"
+                  class="w-full text-left p-3 rounded-md bg-gray-900 border border-gray-800 hover:border-green-500/50 transition-colors group"
+                  @click="useVaultExample(ex)"
+                >
+                  <div class="flex items-center justify-between">
+                    <span class="text-sm text-gray-300 group-hover:text-white transition-colors">{{ ex.title }}</span>
+                    <span class="text-xs px-1.5 py-0.5 rounded bg-gray-800 text-gray-500">{{ ex.language }}</span>
+                  </div>
+                  <p class="text-xs text-gray-500 mt-1 line-clamp-1">{{ ex.description }}</p>
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -120,7 +185,97 @@ const editing = ref(false);
 const editId = ref<number | null>(null);
 const search = ref('');
 const langFilter = ref('');
+const searchMode = ref<'keyword' | 'semantic'>('keyword');
 const explaining = ref(false);
+
+function toggleSearchMode() {
+  searchMode.value = searchMode.value === 'keyword' ? 'semantic' : 'keyword';
+  loadSnippets();
+}
+
+// Example snippets for the guide (reactive to locale)
+const { locale } = useI18n();
+const vaultExamples = computed(() => {
+  const zh = locale.value === 'zh';
+  return [
+    {
+      title: zh ? 'HTTP 服务器 (Node.js)' : 'HTTP Server (Node.js)',
+      language: 'typescript',
+      description: zh ? '基于 Node.js http 模块的简单 HTTP 服务器' : 'A simple HTTP server using Node.js http module',
+      code: zh
+        ? `import http from 'node:http';
+
+const server = http.createServer((req, res) => {
+  res.writeHead(200, { 'Content-Type': 'text/plain' });
+  res.end('Hello World\\n');
+});
+
+server.listen(3000, () => {
+  console.log('Server running at http://localhost:3000/');
+});`
+        : `import http from 'node:http';
+
+const server = http.createServer((req, res) => {
+  res.writeHead(200, { 'Content-Type': 'text/plain' });
+  res.end('Hello World\\n');
+});
+
+server.listen(3000, () => {
+  console.log('Server running at http://localhost:3000/');
+});`,
+      tags: 'http,server,node.js',
+    },
+    {
+      title: zh ? 'React useState 示例' : 'React useState Example',
+      language: 'typescript',
+      description: zh ? 'React 函数组件中使用 useState Hook' : 'Using useState Hook in a React function component',
+      code: `import { useState } from 'react';
+
+export function Counter() {
+  const [count, setCount] = useState(0);
+
+  return (
+    <div>
+      <p>Count: {count}</p>
+      <button onClick={() => setCount(count + 1)}>+1</button>
+      <button onClick={() => setCount(0)}>Reset</button>
+    </div>
+  );
+}`,
+      tags: 'react,hooks,useState',
+    },
+    {
+      title: zh ? 'SQL 建表语句' : 'SQL Table Creation',
+      language: 'sql',
+      description: zh ? '创建用户表的标准 SQL，含主键和时间戳' : 'Standard SQL for creating a users table with PK and timestamps',
+      code: `CREATE TABLE users (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  username TEXT NOT NULL UNIQUE,
+  email TEXT NOT NULL UNIQUE,
+  password_hash TEXT NOT NULL,
+  role TEXT NOT NULL DEFAULT 'user',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_users_email ON users(email);
+CREATE INDEX idx_users_username ON users(username);`,
+      tags: 'sql,ddl,table',
+    },
+  ];
+});
+
+function useVaultExample(ex: typeof vaultExamples.value[number]) {
+  editing.value = true;
+  editId.value = null;
+  selected.value = null;
+  selectedId.value = null;
+  form.title = ex.title;
+  form.description = ex.description;
+  form.language = ex.language;
+  form.tagsInput = ex.tags;
+  form.code = ex.code;
+}
 
 const languages = computed(() => {
   const langs = new Set(snippets.value.map((s: any) => s.language).filter(Boolean));
@@ -135,6 +290,9 @@ async function loadSnippets() {
   const params = new URLSearchParams();
   if (search.value) params.set('search', search.value);
   if (langFilter.value) params.set('language', langFilter.value);
+  if (searchMode.value === 'semantic' && search.value) {
+    params.set('mode', 'semantic');
+  }
   try {
     snippets.value = await $fetch(`/api/snippets?${params}`, { headers: authHeader });
   } catch { /* ignore */ }
@@ -208,6 +366,20 @@ async function requestExplain() {
     // keep going without explanation
   } finally {
     explaining.value = false;
+  }
+}
+
+// Backfill embeddings for existing snippets
+const backfillStatus = ref('');
+async function runBackfill() {
+  backfillStatus.value = t('vault.backfillProcessing');
+  try {
+    const res = await $fetch('/api/snippets/backfill', { method: 'POST', headers: authHeader });
+    backfillStatus.value = t('vault.backfillDone')
+      .replace('{processed}', String(res.processed))
+      .replace('{failed}', String(res.failed));
+  } catch (e: any) {
+    backfillStatus.value = `Error: ${e.data?.statusMessage || e.message}`;
   }
 }
 

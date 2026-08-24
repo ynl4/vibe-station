@@ -8,6 +8,11 @@ export default defineNuxtConfig({
 
   vite: {
     plugins: [tailwindcss()],
+    optimizeDeps: {
+      // Prebundle web-llm eagerly at dev startup so the client plugin never
+      // hits a stale dynamically-imported prebundle (v=... hash mismatch).
+      include: ['@mlc-ai/web-llm'],
+    },
   },
 
   // ── App Head (SEO & Meta) ──────────────────────────────────
@@ -19,7 +24,7 @@ export default defineNuxtConfig({
         { charset: 'utf-8' },
         { name: 'viewport', content: 'width=device-width, initial-scale=1' },
         { name: 'description', content: 'Vibe Station — 个人 AI Developer Workspace，集成 AI Chat、Prompt Studio、Code Vault 和 Devlog' },
-        { name: 'author', content: 'yzh' },
+        { name: 'author', content: 'ynl4' },
         { property: 'og:type', content: 'website' },
         { property: 'og:title', content: 'Vibe Station' },
         { property: 'og:description', content: '个人 AI Developer Workspace — AI Chat + Prompt Studio + Code Vault' },
@@ -44,9 +49,13 @@ export default defineNuxtConfig({
   },
 
   runtimeConfig: {
-    githubUsername: process.env.GITHUB_USERNAME || 'yzh',
+    githubUsername: process.env.GITHUB_USERNAME || 'ynl4',
     public: {
       accessToken: process.env.ACCESS_TOKEN || 'dev-token-change-me',
+      // Optional mirrors for the local Qwen model download (see .env.example).
+      // Defaults to huggingface.co / raw.githubusercontent.com.
+      localLLMModelUrl: process.env.LOCAL_LLM_MODEL_URL || '',
+      localLLMModelLibUrl: process.env.LOCAL_LLM_MODEL_LIB_URL || '',
     },
   },
 });

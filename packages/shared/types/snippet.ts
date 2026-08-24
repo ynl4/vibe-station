@@ -6,5 +6,6 @@ export interface Snippet {
   language: string;
   explanation: string | null;
   tags: string[];
+  embedding?: number[] | null;
   createdAt: Date;
 }

@@ -8,5 +8,6 @@ export const snippets = sqliteTable('snippets', {
   language: text('language').notNull(),
   explanation: text('explanation'),
   tags: text('tags', { mode: 'json' }).$type<string[]>().default([]),
+  embedding: text('embedding'),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
 });

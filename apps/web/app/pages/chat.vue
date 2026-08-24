@@ -50,35 +50,89 @@
         >
           {{ t('chat.cloud') }} (DeepSeek)
         </button>
+        <!-- Local (Qwen): one button for all states -->
         <button
-          v-if="localLLM.canUse"
           :class="[
             'text-xs px-2 py-1 rounded transition-colors',
-            model === 'qwen-local'
+            model === 'qwen-local' && modelState === 'ready'
               ? 'bg-green-900/50 text-green-400 border border-green-700'
-              : localLLM.modelState === 'error'
-                ? 'text-red-500 hover:text-red-400'
-                : 'text-gray-500 hover:text-gray-300'
+              : modelState === 'error'
+                ? 'text-red-400 hover:text-red-300'
+                : modelState === 'downloading'
+                  ? 'text-yellow-400'
+                  : 'text-gray-500 hover:text-gray-300'
           ]"
-          :title="localLLM.modelState === 'error' ? localLLM.errorMessage : 'Local Qwen 2.5 0.5B'"
-          @click="switchToLocal"
+          :title="modelState === 'error' ? errorMessage : ''"
+          @click="switchToLocal()"
         >
-          <template v-if="localLLM.modelState === 'downloading'">
-            Local {{ Math.round(localLLM.downloadProgress * 100) }}%
+          <template v-if="modelState === 'downloading'">
+            {{ t('chat.local') }} {{ Math.round(downloadProgress * 100) }}%
           </template>
-          <template v-else-if="localLLM.modelState === 'ready'">
-            Local (Qwen) ✓
+          <template v-else-if="modelState === 'error'">
+            {{ t('chat.local') }} ({{ locale === 'zh' ? '重试' : 'retry' }})
           </template>
-          <template v-else-if="localLLM.modelState === 'error'">
-            Local (error)
+          <template v-else-if="modelState === 'ready'">
+            {{ t('chat.local') }} (Qwen) ✓
           </template>
           <template v-else>
-            Local (Qwen) ↓
+            {{ t('chat.local') }} (Qwen) ↓
           </template>
         </button>
-        <span v-else class="text-xs text-gray-600" title="WebGPU/WebAssembly not available">
-          Local N/A
-        </span>
+      </div>
+
+      <!-- Download Progress Bar -->
+      <div
+        v-if="modelState === 'downloading'"
+        class="px-4 py-2 border-b border-gray-800 bg-gray-900/30 shrink-0 space-y-1"
+      >
+        <div class="flex items-center justify-between text-xs">
+          <span class="text-yellow-400">{{ t('chat.modelDownloading') }}...</span>
+          <span class="text-gray-500">
+            {{ Math.round(downloadProgress * 100) }}%
+            <span class="text-gray-600">{{ downloadElapsed }}s</span>
+          </span>
+        </div>
+        <div class="w-full h-2 bg-gray-800 rounded-full overflow-hidden">
+          <div
+            class="h-full bg-gradient-to-r from-green-600 to-green-400 rounded-full transition-all duration-300 relative overflow-hidden"
+            :style="{ width: Math.max(Math.round(downloadProgress * 100), 2) + '%' }"
+          >
+            <div class="absolute inset-0 progress-shimmer" />
+          </div>
+        </div>
+        <div v-if="downloadText" class="text-xs text-gray-600 truncate">
+          {{ downloadText }}
+        </div>
+        <p
+          v-if="downloadProgress === 0 && downloadElapsed > 30"
+          class="text-xs text-orange-400"
+        >
+          {{ locale === 'zh'
+            ? '下载长时间无进展，请检查网络后重试。'
+            : 'Download seems stalled. Check your network and try again.' }}
+        </p>
+      </div>
+
+      <!-- Local model error -->
+      <div
+        v-else-if="modelState === 'error'"
+        class="px-4 py-2 border-b border-gray-800 bg-red-950/30 shrink-0"
+      >
+        <p class="text-xs text-red-400">{{ errorMessage }}</p>
+        <div class="flex items-center gap-2 mt-2">
+          <button
+            class="text-xs px-2 py-1 rounded border border-red-700 text-red-300 hover:bg-red-900/50 transition-colors"
+            @click="switchToLocal()"
+          >
+            {{ locale === 'zh' ? '重试' : 'Retry' }}
+          </button>
+          <button
+            class="text-xs px-2 py-1 rounded border border-yellow-700 text-yellow-300 hover:bg-yellow-900/30 transition-colors"
+            @click="clearCacheAndRetry()"
+          >
+            {{ locale === 'zh' ? '清除缓存并刷新重试' : 'Clear cache & reload' }}
+          </button>
+        </div>
       </div>
 
       <!-- Messages -->
@@ -157,19 +211,55 @@ const {
 const localLLM = useLocalLLM();
 setLocalLLM(localLLM);
 
+// Expose refs at top level so the template auto-unwraps them. Vue only
+// unwraps top-level refs (or refs inside reactive objects); refs nested in a
+// plain object are NOT unwrapped, which previously made all state checks in
+// the template compare a Ref object against a string (always false).
+const { modelState, downloadProgress, downloadText, errorMessage, downloadElapsed } = localLLM;
+
 const input = ref('');
 const messagesEl = ref<HTMLElement | null>(null);
 
 function switchToLocal() {
-  if (localLLM.modelState.value === 'idle') {
-    localLLM.loadModel();
+  const state = localLLM.modelState.value;
+  console.log('[switchToLocal] current state:', state);
+  if (state === 'downloading') return;
+  if (state === 'idle' || state === 'error') {
+    console.log('[switchToLocal] calling loadModel...');
+    const config = useRuntimeConfig();
+    localLLM.loadModel({
+      modelUrl: config.public.localLLMModelUrl || undefined,
+      modelLibUrl: config.public.localLLMModelLibUrl || undefined,
+    });
   }
-  model.value = 'qwen-local';
+  if (state === 'ready') {
+    console.log('[switchToLocal] switching model to local');
+    model.value = 'qwen-local';
+  }
 }
+
+async function clearCacheAndRetry() {
+  const ok = await localLLM.clearModelCache();
+  console.log('[chat] model cache cleared:', ok);
+  // A stale web-llm runtime (e.g. two copies left behind by dev-server
+  // restarts) cannot be fixed in place — only a full page reload guarantees
+  // a single fresh instance. Reload and auto-start the download.
+  const url = new URL(window.location.href);
+  url.searchParams.set('startLocal', '1');
+  window.location.href = url.toString();
+}
+
+// Auto-switch model when local download completes
+watch(() => localLLM.modelState.value, (state) => {
+  if (state === 'ready') model.value = 'qwen-local';
+});
 
 onMounted(() => {
   loadSessions();
   localLLM.init();
+  if (new URLSearchParams(window.location.search).get('startLocal') === '1') {
+    switchToLocal();
+  }
 });
 
 async function handleSend() {
@@ -184,3 +274,18 @@ async function handleSend() {
   });
 }
 </script>
+
+<style scoped>
+.progress-shimmer {
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.35), transparent);
+  animation: progress-shimmer 1.2s infinite;
+}
+@keyframes progress-shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+</style>

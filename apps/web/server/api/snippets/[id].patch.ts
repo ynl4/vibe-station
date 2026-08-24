@@ -1,5 +1,6 @@
 import { snippets } from '@vibe/db/schema';
 import { eq } from 'drizzle-orm';
+import { embedSnippet, serializeEmbedding } from '../../utils/embedding';
 
 export default defineEventHandler(async (event) => {
   const db = useDB();
@@ -23,6 +24,29 @@ export default defineEventHandler(async (event) => {
     .where(eq(snippets.id, id))
     .returning()
     .get();
+
+  // Regenerate embedding when content-relevant fields change.
+  // Updating only the explanation does NOT trigger re-embedding.
+  const contentChanged = ['title', 'description', 'code', 'tags'].some(
+    (k) => body[k] !== undefined,
+  );
+  if (contentChanged && process.env.DEEPSEEK_API_KEY) {
+    const merged = { ...existing, ...body };
+    embedSnippet({
+      title: merged.title,
+      description: merged.description,
+      code: merged.code,
+      tags: merged.tags || [],
+    })
+      .then((vec) => {
+        db.update(snippets)
+          .set({ embedding: serializeEmbedding(vec) } as any)
+          .where(eq(snippets.id, id))
+          .run();
+        console.log('[embedding] Regenerated for snippet #' + id);
+      })
+      .catch((err) => console.error('[embedding] Failed to update snippet #' + id + ':', err.message));
+  }
 
   return result;
 });

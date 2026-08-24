@@ -109,8 +109,71 @@
 
     <!-- Right: Playground -->
     <div class="flex-1 flex flex-col min-w-0">
-      <div v-if="!selectedTemplate" class="flex-1 flex items-center justify-center text-gray-600 text-sm">
-        {{ t('prompts.noTemplate') }}
+      <!-- Guide (shown when no template selected) -->
+      <div v-if="!selectedTemplate" class="flex-1 overflow-y-auto p-4 space-y-6">
+        <div class="p-5 rounded-lg border border-purple-800/50 bg-purple-900/10 space-y-4">
+          <h3 class="text-sm font-semibold text-purple-300 flex items-center gap-2">
+            <span class="text-lg">💡</span>
+            {{ locale === 'zh' ? 'Prompt Studio 使用指南' : 'Prompt Studio Guide' }}
+          </h3>
+
+          <!-- Step 1 -->
+          <div class="space-y-2">
+            <h4 class="text-xs font-semibold text-gray-400">
+              {{ locale === 'zh' ? '① 创建模板' : '① Create a Template' }}
+            </h4>
+            <p class="text-xs text-gray-500 leading-relaxed">
+              {{ locale === 'zh'
+                ? '在左侧新建一个 Prompt 模板。使用 &#123;&#123;变量名&#125;&#125; 语法定义占位符——支持英文和中文变量名。系统会自动检测所有变量。'
+                : 'Create a new prompt template. Use &#123;&#123;variable&#125;&#125; syntax to define placeholders — English and Chinese variable names are both supported. Variables are auto-detected.' }}
+            </p>
+          </div>
+
+          <!-- Step 2 -->
+          <div class="space-y-2">
+            <h4 class="text-xs font-semibold text-gray-400">
+              {{ locale === 'zh' ? '② 填入变量' : '② Fill Variables' }}
+            </h4>
+            <p class="text-xs text-gray-500 leading-relaxed">
+              {{ locale === 'zh'
+                ? '选择模板后，右侧 Playground 自动生成变量表单。每个变量都是必填项——未填写时无法运行，红色边框提示缺失字段。'
+                : 'Select a template, and the Playground auto-generates a variable form. Every variable is required — the Run button stays disabled until all are filled.' }}
+            </p>
+          </div>
+
+          <!-- Step 3 -->
+          <div class="space-y-2">
+            <h4 class="text-xs font-semibold text-gray-400">
+              {{ locale === 'zh' ? '③ 运行测试' : '③ Run & Test' }}
+            </h4>
+            <p class="text-xs text-gray-500 leading-relaxed">
+              {{ locale === 'zh'
+                ? '点击 Run，Prompt 通过 DeepSeek 云端执行，结果以流式输出。每次运行自动记录变量快照、延迟和 token 数，可在底部测试记录中回溯。'
+                : 'Click Run to execute via DeepSeek. Results stream in real-time. Every run is recorded with variable snapshots, latency, and token count — reviewable in the test records panel.' }}
+            </p>
+          </div>
+
+          <!-- Example templates -->
+          <div class="space-y-2 pt-2 border-t border-gray-800">
+            <h4 class="text-xs font-semibold text-purple-400">
+              📋 {{ locale === 'zh' ? '示例模板' : 'Example Templates' }}
+            </h4>
+            <div class="space-y-2">
+              <button
+                v-for="ex in examples"
+                :key="ex.title"
+                class="w-full text-left p-3 rounded-md bg-gray-900 border border-gray-800 hover:border-purple-500/50 transition-colors group"
+                @click="useExample(ex)"
+              >
+                <div class="flex items-center justify-between">
+                  <span class="text-sm text-gray-300 group-hover:text-white transition-colors">{{ ex.title }}</span>
+                  <span class="text-xs text-gray-600">{{ ex.category }}</span>
+                </div>
+                <p class="text-xs text-gray-500 mt-1 line-clamp-1">{{ ex.template }}</p>
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div v-else class="flex-1 flex flex-col overflow-y-auto p-4 space-y-4">
@@ -336,6 +399,46 @@ async function handleRun() {
 
 function formatDate(d: string) {
   return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+// Example templates for the guide (reactive to locale)
+const examples = computed(() => {
+  const zh = locale.value === 'zh';
+  return [
+    {
+      title: zh ? '代码审查助手' : 'Code Review Assistant',
+      category: 'coding',
+      template: zh
+        ? '请审查以下 {{语言}} 代码，重点关注：\n1. 潜在的 bug 和边界情况\n2. 性能优化建议\n3. 代码风格和可读性\n\n```{{语言}}\n{{代码}}\n```'
+        : 'Review the following {{language}} code, focusing on:\n1. Potential bugs and edge cases\n2. Performance improvements\n3. Code style and readability\n\n```{{language}}\n{{code}}\n```',
+    },
+    {
+      title: zh ? '技术文档生成' : 'Technical Doc Generator',
+      category: 'writing',
+      template: zh
+        ? '为以下 {{功能名称}} 编写 API 文档：\n\n## 接口说明\n简要描述接口用途。\n\n## 请求参数\n| 参数名 | 类型 | 必填 | 说明 |\n## 响应示例\n```json\n{}\n```\n\n## 错误码\n列出常见错误。'
+        : 'Write API documentation for {{feature_name}}:\n\n## Overview\nBrief description of the endpoint.\n\n## Request Parameters\n| Name | Type | Required | Description |\n## Response Example\n```json\n{}\n```\n\n## Error Codes\nList common errors.',
+    },
+    {
+      title: zh ? 'SQL 查询优化' : 'SQL Query Optimizer',
+      category: 'analysis',
+      template: zh
+        ? '分析以下 SQL 查询的性能问题并给出优化建议：\n\n数据库：{{数据库类型}}\n表结构：\n{{表结构}}\n\n查询语句：\n```sql\n{{SQL语句}}\n```'
+        : 'Analyze the following SQL query for performance issues and suggest optimizations:\n\nDatabase: {{db_type}}\nTable Schema:\n{{schema}}\n\nQuery:\n```sql\n{{query}}\n```',
+    },
+  ];
+});
+
+function useExample(ex: typeof examples[0]) {
+  select(null);
+  form.title = ex.title;
+  form.template = ex.template;
+  form.category = ex.category;
+  form.tagsInput = '';
+  editorMsg.value = '';
+  playVars.value = {};
+  runOutput.value = '';
+  runError.value = '';
 }
 
 onMounted(() => loadTemplates());

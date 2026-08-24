@@ -32,7 +32,7 @@ const CACHE_TTL = 6 * 60 * 60 * 1000; // 6 hours
 const cache = new Map<string, CacheEntry>();
 
 export default defineEventHandler(async (event) => {
-  const username = useRuntimeConfig(event).githubUsername || 'yzh';
+  const username = useRuntimeConfig(event).githubUsername || 'ynl4';
 
   // Check cache
   const cached = cache.get(username);

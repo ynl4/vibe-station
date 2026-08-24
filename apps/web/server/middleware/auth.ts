@@ -2,6 +2,7 @@
  * Access Token authentication middleware.
  * All /api/* routes require a valid Bearer token, except:
  *   - /api/github-stats (public)
+ *   - /api/llm-model/* (public model file proxy for WebLLM)
  *
  * Token is configured via ACCESS_TOKEN env variable.
  */
@@ -13,6 +14,7 @@ export default defineEventHandler((event) => {
 
   // Public routes (no auth required)
   if (path === '/api/github-stats') return;
+  if (path.startsWith('/api/llm-model/')) return;
 
   // Allow preflight requests
   if (event.method === 'OPTIONS') return;

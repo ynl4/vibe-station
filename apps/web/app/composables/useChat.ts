@@ -156,9 +156,9 @@ export function useChat() {
       return;
     }
 
+    // Build history: all non-empty messages (placeholder with '' content is auto-excluded)
     const history = messages.value
-      .filter(m => m.content && m.role !== 'assistant' ? true : m.content) // include filled messages
-      .slice(0, -1) // exclude the placeholder we just added
+      .filter(m => m.content)
       .map(m => ({ role: m.role, content: m.content }));
 
     const startTime = Date.now();
@@ -167,7 +167,7 @@ export function useChat() {
       for await (const chunk of localLLM.chat(history)) {
         if (chunk.startsWith('__META__')) {
           const meta = JSON.parse(chunk.slice(8));
-          assistantMsg.model = 'qwen2.5-0.5b';
+          assistantMsg.model = 'qwen2-0.5b';
           assistantMsg.provider = 'local';
           assistantMsg.latencyMs = meta.latency;
         } else {
