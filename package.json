@@ -1,0 +1,27 @@
+{
+  "name": "vibe-station",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --filter @vibe/web dev",
+    "build": "pnpm --filter @vibe/web build",
+    "preview": "pnpm --filter @vibe/web preview",
+    "db:generate": "pnpm --filter @vibe/db db:generate",
+    "db:migrate": "pnpm --filter @vibe/db db:migrate",
+    "docker:build": "docker build -t vibe-station -f scripts/Dockerfile .",
+    "docker:run": "docker run -d -p 3000:3000 --name vibe-station --volume ./data:/app/data --env-file .env vibe-station",
+    "deploy": "bash scripts/deploy.sh",
+    "backup": "bash scripts/backup-db.sh",
+    "test": "pnpm --filter @vibe/web test"
+  },
+  "devDependencies": {
+    "@oxc-parser/binding-win32-x64-msvc": "^0.143.0",
+    "@rolldown/binding-win32-x64-msvc": "^1.2.3",
+    "oxc-parser": "0.143.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "better-sqlite3",
+      "esbuild"
+    ]
+  }
+}
